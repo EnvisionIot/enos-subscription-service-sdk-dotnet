@@ -1,0 +1,90 @@
+syntax = "proto2";
+
+package proto;
+option csharp_namespace = "enos_subscription_service.proto";
+
+enum CmdId {
+    idle_req = 0;
+    idle_rsp = 1;
+    auth_req = 2;
+    auth_rsp = 3;
+    pull_req = 4;
+    pull_rsp = 5;
+    sub_req = 6;
+    sub_rsp = 7;
+    commit_req = 8;
+    commit_rsp = 9;
+    close_req = 10;
+    close_rsp = 11;
+}
+
+message IdleReq{
+}
+
+message IdleRsp {
+    required int64 svrTime = 1;
+}
+
+message AuthReq {
+    required string accessKey = 1;
+    required string subId = 2;
+    required string sign = 3;
+    required int32 subType = 4;
+}
+
+message AuthRsp {
+    required int32 ack = 1;
+    optional string msg = 2;
+    optional string channelId = 3;
+}
+
+message SubReq {
+    required int32 category = 1;
+    required string clientId = 2;
+    required string subId = 3;
+    required string accessKey = 4;
+    required string consumerGroup = 5;
+}
+
+message SubRsp {
+    required int32 ack = 1;
+    optional string channelId = 2;
+    optional string msg = 3;
+}
+
+message PullReq {
+    required int64 id = 1;
+}
+
+message Message {
+    required string topic = 1;
+    required int32 partition = 2;
+    required int64 offset = 3;
+    required int64 timestamp = 4;
+    optional string key = 5;
+    optional string value = 6;
+}
+
+message MessageDTO {
+    repeated Message messages = 1;
+}
+
+message PullRsp {
+    required int64 id = 1;
+    required int32 code = 2;
+    required MessageDTO msgDTO = 3;
+}
+
+message Commit {
+    required string topic = 1;
+    required int32 partition = 2;
+    required int64 offset = 3;
+}
+
+message CommitDTO {
+    repeated Commit commits = 1;
+}
+
+message CloseReq {
+    required int64 id = 1;
+}

@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29920.165
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "enos-subscription-service", "enos-subscription-service\enos-subscription-service.csproj", "{D035B13E-0B6A-4DC1-B2F4-2B6902CA9339}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "enos-subscription-service.sample", "enos-subscription-service.sample\enos-subscription-service.sample.csproj", "{7ABB7560-7998-45AD-A244-AD28FF9AED05}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D035B13E-0B6A-4DC1-B2F4-2B6902CA9339}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D035B13E-0B6A-4DC1-B2F4-2B6902CA9339}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D035B13E-0B6A-4DC1-B2F4-2B6902CA9339}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D035B13E-0B6A-4DC1-B2F4-2B6902CA9339}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7ABB7560-7998-45AD-A244-AD28FF9AED05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7ABB7560-7998-45AD-A244-AD28FF9AED05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7ABB7560-7998-45AD-A244-AD28FF9AED05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7ABB7560-7998-45AD-A244-AD28FF9AED05}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C4B49B98-B192-41E7-B49D-8A3C9E7EC4C3}
+	EndGlobalSection
+EndGlobal

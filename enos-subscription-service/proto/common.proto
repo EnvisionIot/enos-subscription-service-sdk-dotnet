@@ -1,0 +1,70 @@
+syntax = "proto2";
+
+package proto;
+option csharp_namespace = "enos_subscription_service.proto";
+
+enum CommonMsgType {
+    ENUM_KVPairRecord2_0 = 101;
+}
+
+message TransferPkg {
+    required int32 cmdId = 1;
+    required bytes data = 2;    //gzip data
+    required int32 seqId = 3;
+    optional bool zip = 4;
+    optional uint32 ver = 5;    //version
+}
+
+message AsterPkg {
+    required int32 seqno = 1;
+    required int32 ackno = 2;
+    optional int32 flag = 3;
+    optional int32 wnd = 4;
+    repeated bytes data = 7;
+}
+
+message TransferAck {
+}
+
+message PointAttr {
+    required string key = 1;
+    required string value = 2;
+}
+
+message SliceTrigger {
+    required bool isSame = 1;
+    required int64 sliceLen = 2;
+}
+
+message KVPair2_0 {
+    required string point = 1; //point
+    required string value = 2; //value
+    required string domain = 3; //domain
+    repeated PointAttr attrs = 4; //attrs
+    repeated SliceTrigger sliceTrigger = 5;
+}
+
+message KVPairDevice2_0 {
+    repeated KVPair2_0 datas = 1; //data
+    required string device = 2; //device id
+}
+
+message KVPairRecord2_0 {
+    required int64 collectTime = 1; //collect time.
+    repeated KVPairDevice2_0 deviceDatas = 2;
+    required int64 sendTime = 3;  //send time.
+}
+
+message KVPair {
+  required string deviceId = 1;
+  required string point = 2;
+  required string value = 3;
+  repeated PointAttr attrs = 4;
+  required string domain = 5;
+}
+
+message KVPairRecord {
+    required int64 utc = 1;
+    repeated KVPair datas = 2;
+    optional int64 ts = 3;
+}
