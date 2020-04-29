@@ -3,6 +3,8 @@ using enos_subscription_service.util;
 using ProtoBuf;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -29,7 +31,7 @@ namespace enos_subscription_service.core
         private readonly int ping_interval_in_sec = 10;
         private readonly int ping_timeout_in_millsec = 500;
         private readonly int DEFAULT_MESSAGE_QUEUE_SIZE = 100;
-        private readonly int message_max_size = 1024 * 1024 * 5;
+        private readonly int message_max_size = 10000000;
 
         private static NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
         private BlockingCollection<Message> queue { get; set; } = null;
@@ -80,9 +82,10 @@ namespace enos_subscription_service.core
 
                     //IPEndPoint myEP = new IPEndPoint(IPAddress.Any, 12345);
                     //clientSocket.Bind(myEP);
-
-                    clientSocket.ReceiveBufferSize = message_max_size;
+                    //clientSocket.ReceiveTimeout = 3000;
+                    //clientSocket.ReceiveBufferSize = 0;message_max_size;
                     clientSocket.Connect(remoteEP);
+                    //clientSocket.Accept();
 
                     Thread.Sleep(1000);
                     //isConnected = clientSocket.Connected;
@@ -141,7 +144,6 @@ namespace enos_subscription_service.core
 
         void sub()
         {
-
             SubReq sub_req = new SubReq();
 
             sub_req.category = subType;
@@ -168,7 +170,7 @@ namespace enos_subscription_service.core
                 {
                     isConnected = true;
                     //new thread to run fetching
-                    Thread.Sleep(2000);
+                    //Thread.Sleep(2000);
                     SubFetcher fetcher = new SubFetcher();
                     Thread fetchthread = new Thread(() => fetcher.Run(this));
                     fetchthread.Start();
@@ -200,42 +202,55 @@ namespace enos_subscription_service.core
             TransferPkg pull_res = send_and_recv(msg, true);
             if (pull_res == null)
             {
-                //_logger.Error("Pull fail, receive unexpect response, need PullRsp, receive nothing.");
+                _logger.Error("Pull fail, receive unexpect response, need PullRsp, receive nothing.");
                 reconnect();
                 return;
             }
             if (pull_res.cmdId == (int)CmdId.PullRsp)
             {
                 PullRsp rsp = ProtoBufDecoder.DeserializeToObj<PullRsp>(pull_res.data);
+                if (rsp.msgDTO.messages.Count > 0)
+                {
+                    _logger.Info("Got " + rsp.msgDTO.messages.Count + " message(s).");
+                }
                 foreach (var message in rsp.msgDTO.messages)
                 {
-                    _logger.Info(string.Format("Got message, key: {0}, partition: {1}, offset: {2}", message.key, message.partition, message.offset));
+                    _logger.Trace(string.Format("Got message, key: {0}, partition: {1}, offset: {2}, topic: {3}", message.key, message.partition, message.offset, message.topic));
                     queue.Add(message);
                 }
+            }
+            else
+            {
+                _logger.Error("Pull fail, receive unexpect response, need PullRsp, receive " + pull_res.cmdId);
             }
 
         }
 
         public void commit_offsets(CommitDTO commit_dto)
         {
-            if (!isConnected || commit_dto == null)
+            if (!isConnected || commit_dto == null || commit_dto.commits.Count==0)
                 return;
 
-            _logger.Info("committing offset..., total number: "+ commit_dto.commits.Count());
+            _logger.Info("committing offset...");
+
+            foreach (var commit in commit_dto.commits)
+            {
+                _logger.Info(string.Format("committing topic: {0}, partition: {1}, offset: {2}  ", commit.topic, commit.partition, commit.offset));
+            }
 
             byte[] msg = build_pkg((int)CmdId.CommitReq, ProtoBufEncoder.SerializeToBytes(commit_dto));
 
-            TransferPkg commit_res = send_and_recv(msg, false, true);
+            TransferPkg commit_res = send_and_recv(msg, false, false);
             if (commit_res == null)
             {
                 _logger.Error("Commit fail, receive unexpect response, need CommitRsp, receive nothing.");
                 reconnect();
                 return;
             }
-            //if (commit_res.cmdId != -3)
-            //{
-            //    _logger.Error("Error occur commiting offset, reconnecting...");
-            //}
+            if (commit_res.cmdId != -3)
+            {
+                _logger.Error("Error occur commiting offset, reconnecting...");
+            }
         }
         public Message poll()
         {
@@ -246,16 +261,14 @@ namespace enos_subscription_service.core
         {
             lock (lockobj)
             {
+                byte[] data = new byte[4];
                 try
                 {
                     clientSocket.Send(message);
                     if (need_recv)
                     {
-                        int message_size = message_max_size;
-                        byte[] receivedBuf = new byte[message_size];
-                        int rec = clientSocket.Receive(receivedBuf);
-                        byte[] data = new byte[rec];
-                        Array.Copy(receivedBuf, data, rec);
+                        data = receivePkg(is_pull_req);
+                        string txt = Encoding.UTF8.GetString(data);
                         return ProtoBufDecoder.DeserializeToObj<TransferPkg>(data, true);
                     }
                     else
@@ -265,7 +278,10 @@ namespace enos_subscription_service.core
                 }
                 catch (Exception ex)
                 {
-                    //_logger.Error("Error send and rev message: " + ex.Message);
+                    _logger.Error("Error send and rev message: " + ex.Message);
+
+                    //_logger.Info("received data: " + Encoding.UTF8.GetString(data));
+
                     if (ex is SocketException)
                     {
                         reconnect();
@@ -275,6 +291,36 @@ namespace enos_subscription_service.core
                 return new TransferPkg { cmdId = -2 };
             }
         }
+
+        private byte[] receivePkg(bool is_pull = false)
+        {
+            if (is_pull)
+            {
+                int buffer_size = clientSocket.ReceiveBufferSize;
+                List<byte> list = new List<byte>();
+                while (true)
+                {
+                    byte[] buffer = new byte[buffer_size];
+                    int rec = clientSocket.Receive(buffer, 0, buffer.Length, 0);
+                    byte[] data = new byte[rec];
+                    Array.Copy(buffer, data, rec);
+                    list.AddRange(data);
+                    if (rec > 0 && rec < buffer_size && buffer[rec - 1] == 0)
+                        break;
+                }
+                return list.ToArray();
+            }
+            else
+            {
+                int buffer_size = 100;
+                byte[] buffer = new byte[buffer_size];
+                int rec = clientSocket.Receive(buffer);
+                byte[] data = new byte[rec];
+                Array.Copy(buffer, data, rec);
+                return data;
+            }
+        }
+
 
         public void ping_and_recv()
         {

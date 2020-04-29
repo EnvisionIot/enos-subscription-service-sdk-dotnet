@@ -21,10 +21,12 @@ namespace enos_subscription_service.client
         private int auto_commit_interval_seconds = 5;
         private DateTime next_auto_commit_deadline { get; set; }
         private bool is_started = false;
-        private List<Message> consumer_offset = new List<Message>();
+
+
+        private Dictionary<string, Message> consumer_offset = new Dictionary<string, Message>();
 
         private static NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-        
+
         public SubClient(string _host, int _port, string _accessKey, string _accessSecret)
         {
             host = _host;
@@ -36,13 +38,13 @@ namespace enos_subscription_service.client
         {
             try
             {
-                next_auto_commit_deadline = DateTime.Now.AddSeconds(auto_commit_interval_seconds);
                 client = new BaseClient(host, port, accessKey, accessSecret, _sub_id, subType, _consumer_group);
                 client.start();
                 is_started = true;
+                next_auto_commit_deadline = DateTime.Now.AddSeconds(auto_commit_interval_seconds);
                 _logger.Info("Subscribe successful", _sub_id);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _logger.Error(ex, "Subscribe failed", _sub_id);
                 is_started = false;
@@ -52,17 +54,24 @@ namespace enos_subscription_service.client
 
         private void do_commit()
         {
+            if (consumer_offset.Count == 0)
+                return;
             try
             {
                 CommitDTO commit_dto = new CommitDTO();
-                foreach (Message message in consumer_offset)
+
+                foreach (string key in consumer_offset.Keys)
                 {
-                    commit_dto.commits.Add(new Commit
+                    var message = consumer_offset[key];
+                    if (message != null)
                     {
-                        topic = message.topic,
-                        partition = message.partition,
-                        offset = message.offset
-                    });
+                        commit_dto.commits.Add(new Commit
+                        {
+                            topic = message.topic,
+                            partition = message.partition,
+                            offset = message.offset
+                        });
+                    }
                 }
                 client.commit_offsets(commit_dto);
             }
@@ -70,6 +79,17 @@ namespace enos_subscription_service.client
             {
                 //_logger.log
             }
+        }
+
+        private void addToOffset(Message message)
+        {
+            string key = string.Format("{0}_{1}", message.topic, message.partition);
+            if (consumer_offset.ContainsKey(key))
+            {
+                consumer_offset[key] = message;
+            }
+            else
+                consumer_offset.Add(key, message);
         }
 
         public IEnumerable<Message> GetMessages()
@@ -82,11 +102,19 @@ namespace enos_subscription_service.client
                     consumer_offset.Clear();
                     next_auto_commit_deadline = next_auto_commit_deadline.AddSeconds(auto_commit_interval_seconds);
                 }
-                //Console.WriteLine("requesting for message at:" + DateTime.Now.ToString("HH:mm:ss"));
                 var message = client.poll();
-                consumer_offset.Add(message);
-                _logger.Info(string.Format("Polled message, key: {0}, partition: {1}, offset: {2}" , message.key, message.partition, message.offset));
-                yield return message;
+                addToOffset(message);
+
+                if (message.value != "_*NMM!_")
+                {
+                    _logger.Trace(string.Format("Polled message, key: {0}, partition: {1}, offset: {2}", message.key, message.partition, message.offset));
+                    yield return message;
+                }
+                else
+                {
+                    _logger.Trace(string.Format("Polled _*NMM!_ message, key: {0}, partition: {1}, offset: {2}", message.key, message.partition, message.offset));
+                    break;
+                }
             }
         }
 
