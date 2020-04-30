@@ -22,7 +22,6 @@ namespace enos_subscription_service.core
         private string sub_id { get; set; }
         private int subType { get; set; }
         private string consumer_group { get; set; }
-        private int requestTimeout { get; set; } = 30000;
         public int pull_id { get; set; } = 0;
         public int epoch { get; set; } = 0;
         public DateTime next_ping_deadline { get; set; }
@@ -31,12 +30,12 @@ namespace enos_subscription_service.core
         private readonly int ping_interval_in_sec = 10;
         private readonly int ping_timeout_in_millsec = 500;
         private readonly int DEFAULT_MESSAGE_QUEUE_SIZE = 100;
-        private readonly int message_max_size = 10000000;
 
         private static NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-        private BlockingCollection<Message> queue { get; set; } = null;
+        private BlockingCollection<Message> queue = null;
         internal bool isConnected = false;
-        internal Socket clientSocket = null;
+        internal TcpClient clientSocket = null;
+        NetworkStream stream = null;// clientSocket.GetStream()
 
         public BaseClient(string _host, int _port, string _accessKey, string _accessSecret, string _sub_id, int _sub_type = 0, string _consumer_group = "")
         {
@@ -52,7 +51,6 @@ namespace enos_subscription_service.core
         public void start()
         {
             epoch++;
-            next_ping_deadline = DateTime.Now.AddSeconds(ping_interval_in_sec);
             queue = new BlockingCollection<Message>(DEFAULT_MESSAGE_QUEUE_SIZE);
             connect();
         }
@@ -77,18 +75,11 @@ namespace enos_subscription_service.core
 
                     IPEndPoint remoteEP = new IPEndPoint(ip, port);
 
-                    clientSocket = new Socket(remoteEP.AddressFamily,
-                        SocketType.Stream, ProtocolType.Tcp);
-
-                    //IPEndPoint myEP = new IPEndPoint(IPAddress.Any, 12345);
-                    //clientSocket.Bind(myEP);
-                    //clientSocket.ReceiveTimeout = 3000;
-                    //clientSocket.ReceiveBufferSize = 0;message_max_size;
+                    clientSocket = new TcpClient(AddressFamily.InterNetwork);
                     clientSocket.Connect(remoteEP);
-                    //clientSocket.Accept();
+                    stream = clientSocket.GetStream();
 
                     Thread.Sleep(1000);
-                    //isConnected = clientSocket.Connected;
                 }
                 catch (Exception ex)
                 {
@@ -108,12 +99,13 @@ namespace enos_subscription_service.core
             auth_req.sign = Encryptor.GetHashSha256(accessKey, sub_id, accessSecret);
             auth_req.subType = subType;
 
-            byte[] msg = build_pkg((int)CmdId.AuthReq, ProtoBufEncoder.SerializeToBytes(auth_req));
+            TransferPkg pkg = build_TransferPkg((int)CmdId.AuthReq, ProtoBufEncoder.SerializeToBytes(auth_req));
 
-            TransferPkg auth_res = send_and_recv(msg);
+            TransferPkg auth_res = send_and_recv(pkg);
+
             if (auth_res == null)
             {
-                _logger.Error("Auth fail, receive unexpect response, need AuthRsp, receive nothing.");
+                _logger.Error("Authentication failed, received unexpected response, needed AuthRsp, received nothing.");
                 reconnect();
                 return;
             }
@@ -123,22 +115,18 @@ namespace enos_subscription_service.core
                 AuthRsp rsp = ProtoBufDecoder.DeserializeToObj<AuthRsp>(auth_res.data);
                 if (rsp.ack == 0)
                 {
-                    _logger.Info("auth successfully.");
-                    //new thread to ping server to keep it alive
-                    LifeKeeper lk = new LifeKeeper();
-                    Thread life_keeper = new Thread(() => lk.Run(this));
-                    life_keeper.Start();
-                    //sub
+                    _logger.Info("Authenticated successfully.");
+                    //subscribe
                     sub();
                 }
                 else
                 {
-                    throw new Exception("Auth fail, auth info:" + auth_req.ToString());
+                    throw new Exception("Authentication failed, auth info:" + auth_req.ToString());
                 }
             }
             else
             {
-                throw new Exception("Auth fail, receive unexpect response, need AuthRsp, receive:" + auth_res.cmdId);
+                _logger.Error("Authentication failed, received unexpected response, needed AuthRsp, received:" + auth_res.cmdId);
             }
         }
 
@@ -147,19 +135,19 @@ namespace enos_subscription_service.core
             SubReq sub_req = new SubReq();
 
             sub_req.category = subType;
-            sub_req.clientId = ((IPEndPoint)(clientSocket.LocalEndPoint)).Address.ToString();
+            sub_req.clientId = ((IPEndPoint)(clientSocket.Client.LocalEndPoint)).Address.ToString();
             sub_req.subId = sub_id;
             sub_req.accessKey = accessKey;
             sub_req.consumerGroup = consumer_group;
 
-            byte[] msg = build_pkg((int)CmdId.SubReq, ProtoBufEncoder.SerializeToBytes(sub_req));
+            TransferPkg pkg = build_TransferPkg((int)CmdId.SubReq, ProtoBufEncoder.SerializeToBytes(sub_req));
 
-            TransferPkg sub_res = send_and_recv(msg);
+            TransferPkg sub_res = send_and_recv(pkg);
 
             //check if subscription is successful
             if (sub_res == null)
             {
-                _logger.Error("Sub fail, receive unexpect response, need SubRsp, receive nothing.");
+                _logger.Error("Subscription failed, receive unexpected response, needed SubRsp, received nothing.");
                 reconnect();
                 return;
             }
@@ -169,20 +157,24 @@ namespace enos_subscription_service.core
                 if (rsp.ack == 0)
                 {
                     isConnected = true;
+                    //new thread to ping server to keep it alive
+                    next_ping_deadline = DateTime.Now.AddSeconds(ping_interval_in_sec);
+                    LifeKeeper lk = new LifeKeeper();
+                    Thread life_keeper = new Thread(() => lk.Run(this));
+                    life_keeper.Start();
                     //new thread to run fetching
-                    //Thread.Sleep(2000);
                     SubFetcher fetcher = new SubFetcher();
                     Thread fetchthread = new Thread(() => fetcher.Run(this));
                     fetchthread.Start();
                 }
                 else
                 {
-                    throw new Exception("Sub fail, sub info:" + sub_req.ToString());
+                    throw new Exception("Subscription failed, sub info:" + sub_req.ToString());
                 }
             }
             else
             {
-                throw new Exception("Sub fail, receive unexpect response, need SubRsp, receive:" + sub_res.cmdId);
+                _logger.Error("Subscription failed, receive unexpected response, needed SubRsp, received:" + sub_res.cmdId);
             }
         }
 
@@ -197,12 +189,12 @@ namespace enos_subscription_service.core
 
             _logger.Trace("Pulling data: " + pull_id);
 
-            byte[] msg = build_pkg((int)CmdId.PullReq, ProtoBufEncoder.SerializeToBytes(pull_req));
+            TransferPkg pkg = build_TransferPkg((int)CmdId.PullReq, ProtoBufEncoder.SerializeToBytes(pull_req));
 
-            TransferPkg pull_res = send_and_recv(msg, true);
+            TransferPkg pull_res = send_and_recv(pkg, true);
             if (pull_res == null)
             {
-                _logger.Error("Pull fail, receive unexpect response, need PullRsp, receive nothing.");
+                _logger.Error("Pull failed, received unexpected response, needed PullRsp, received nothing.");
                 reconnect();
                 return;
             }
@@ -221,35 +213,36 @@ namespace enos_subscription_service.core
             }
             else
             {
-                _logger.Error("Pull fail, receive unexpect response, need PullRsp, receive " + pull_res.cmdId);
+                _logger.Error("Pull failed, received unexpected response, needed PullRsp, received " + pull_res.cmdId);
             }
 
         }
 
         public void commit_offsets(CommitDTO commit_dto)
         {
-            if (!isConnected || commit_dto == null || commit_dto.commits.Count==0)
+
+            if (!isConnected || commit_dto == null || commit_dto.commits.Count == 0)
                 return;
 
             _logger.Info("committing offset...");
 
             foreach (var commit in commit_dto.commits)
             {
-                _logger.Info(string.Format("committing topic: {0}, partition: {1}, offset: {2}  ", commit.topic, commit.partition, commit.offset));
+                _logger.Trace(string.Format("committing topic: {0}, partition: {1}, offset: {2}  ", commit.topic, commit.partition, commit.offset));
             }
 
-            byte[] msg = build_pkg((int)CmdId.CommitReq, ProtoBufEncoder.SerializeToBytes(commit_dto));
+            TransferPkg pkg = build_TransferPkg((int)CmdId.CommitReq, ProtoBufEncoder.SerializeToBytes(commit_dto));
 
-            TransferPkg commit_res = send_and_recv(msg, false, false);
+            TransferPkg commit_res = send_and_recv(pkg, false, false);
             if (commit_res == null)
             {
-                _logger.Error("Commit fail, receive unexpect response, need CommitRsp, receive nothing.");
+                _logger.Error("Commit failed, received unexpected response, needed CommitRsp, received nothing.");
                 reconnect();
                 return;
             }
             if (commit_res.cmdId != -3)
             {
-                _logger.Error("Error occur commiting offset, reconnecting...");
+                _logger.Error("Error occured commiting offset, reconnecting...");
             }
         }
         public Message poll()
@@ -257,20 +250,17 @@ namespace enos_subscription_service.core
             _logger.Trace("polling message...");
             return queue.Take();
         }
-        TransferPkg send_and_recv(byte[] message, bool is_pull_req = false, bool need_recv = true)
+        TransferPkg send_and_recv(TransferPkg pkg, bool is_pull_req = false, bool need_recv = true)
         {
             lock (lockobj)
             {
-                byte[] data = new byte[4];
                 try
                 {
-                    clientSocket.Send(message);
+                    //write into stream
+                    Serializer.SerializeWithLengthPrefix(stream, pkg, PrefixStyle.Base128);
                     if (need_recv)
-                    {
-                        data = receivePkg(is_pull_req);
-                        string txt = Encoding.UTF8.GetString(data);
-                        return ProtoBufDecoder.DeserializeToObj<TransferPkg>(data, true);
-                    }
+                        //get response
+                        return Serializer.DeserializeWithLengthPrefix<TransferPkg>(stream, PrefixStyle.Base128);
                     else
                     {
                         return new TransferPkg { cmdId = -3 };
@@ -278,10 +268,7 @@ namespace enos_subscription_service.core
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error("Error send and rev message: " + ex.Message);
-
-                    //_logger.Info("received data: " + Encoding.UTF8.GetString(data));
-
+                    _logger.Error("Error sending and receiving message: " + ex.Message);
                     if (ex is SocketException)
                     {
                         reconnect();
@@ -292,36 +279,6 @@ namespace enos_subscription_service.core
             }
         }
 
-        private byte[] receivePkg(bool is_pull = false)
-        {
-            if (is_pull)
-            {
-                int buffer_size = clientSocket.ReceiveBufferSize;
-                List<byte> list = new List<byte>();
-                while (true)
-                {
-                    byte[] buffer = new byte[buffer_size];
-                    int rec = clientSocket.Receive(buffer, 0, buffer.Length, 0);
-                    byte[] data = new byte[rec];
-                    Array.Copy(buffer, data, rec);
-                    list.AddRange(data);
-                    if (rec > 0 && rec < buffer_size && buffer[rec - 1] == 0)
-                        break;
-                }
-                return list.ToArray();
-            }
-            else
-            {
-                int buffer_size = 100;
-                byte[] buffer = new byte[buffer_size];
-                int rec = clientSocket.Receive(buffer);
-                byte[] data = new byte[rec];
-                Array.Copy(buffer, data, rec);
-                return data;
-            }
-        }
-
-
         public void ping_and_recv()
         {
             lock (lockobj)
@@ -329,12 +286,12 @@ namespace enos_subscription_service.core
                 try
                 {
                     _logger.Trace("Pinging...");
-                    clientSocket.Poll(ping_timeout_in_millsec, SelectMode.SelectRead);
+                    clientSocket.Client.Poll(ping_timeout_in_millsec, SelectMode.SelectRead);
                     next_ping_deadline = DateTime.Now.AddSeconds(ping_interval_in_sec);
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error(ex, "Error occur pinging");
+                    _logger.Error(ex, "Error occured pinging");
                     if (ex is SocketException)
                     {
                         reconnect();
@@ -344,7 +301,8 @@ namespace enos_subscription_service.core
                 }
             }
         }
-        byte[] build_pkg(int message_map, byte[] data)
+
+        TransferPkg build_TransferPkg(int message_map, byte[] data)
         {
             TransferPkg transfer_pkg = new TransferPkg();
             transfer_pkg.seqId = 0;
@@ -353,7 +311,7 @@ namespace enos_subscription_service.core
             transfer_pkg.zip = false;
             transfer_pkg.ver = 0;
 
-            return ProtoBufEncoder.SerializeToBytes(transfer_pkg, true);
+            return transfer_pkg;
         }
 
         public void Dispose()
@@ -364,6 +322,8 @@ namespace enos_subscription_service.core
             {
                 clientSocket.Dispose();
             }
+            if (stream != null)
+                stream.Dispose();
             if (queue != null)
                 queue.Dispose();
         }

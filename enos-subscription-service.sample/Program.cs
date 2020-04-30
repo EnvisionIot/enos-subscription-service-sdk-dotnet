@@ -22,7 +22,7 @@ namespace enos_subscription_service.sample
                     client.subscribe(ConfigurationManager.AppSettings["subid"]);
                     foreach (var message in client.GetMessages())
                     {
-                        Console.WriteLine("got message on client: " + message.key);
+                        //Console.WriteLine("got message on client: " + message.key);
                     }
                 }
                 catch (Exception ex)
