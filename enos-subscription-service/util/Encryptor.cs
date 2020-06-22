@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace enos_subscription_service.util
+namespace enos_subscription.util
 {
   public  class Encryptor
     {

@@ -79,7 +79,7 @@ The features supported by this SDK include:
 ### Code Sample for Consuming Subscribed Real-time Data
 
 ```csharp
-using enos_subscription_service.client;
+using enos_subscription.client;
 
 using (DataClient client = new DataClient("sub-host", "sub-port", "Your Access Key of this subscription", "Your Access Secret of this subscription")) {    
     
@@ -95,7 +95,7 @@ using (DataClient client = new DataClient("sub-host", "sub-port", "Your Access K
 ### Code Sample for Consuming Subscribed Alert Data
 
 ```csharp
-using enos_subscription_service.client;
+using enos_subscription.client;
 
 using (AlertClient client = new AlertClient("sub-host", "sub-port", "Your Access Key of this subscription", "Your Access Secret of this subscription")) {    
     
@@ -111,7 +111,7 @@ using (AlertClient client = new AlertClient("sub-host", "sub-port", "Your Access
 ### Code Sample for Consuming Subscribed Offline Data
 
 ```csharp
-using enos_subscription_service.client;
+using enos_subscription.client;
 
 using (OfflineClient client = new OfflineClient("sub-host", "sub-port", "Your Access Key of this subscription", "Your Access Secret of this subscription")) {    
     

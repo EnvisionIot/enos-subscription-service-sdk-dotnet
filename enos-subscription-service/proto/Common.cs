@@ -3,7 +3,7 @@
 // Input: my.proto
 
 #pragma warning disable 1591, 0612, 3021
-namespace enos_subscription_service.proto
+namespace enos_subscription.proto
 {
 
     [global::ProtoBuf.ProtoContract()]

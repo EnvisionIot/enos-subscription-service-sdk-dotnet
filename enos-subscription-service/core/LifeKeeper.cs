@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace enos_subscription_service.core
+namespace enos_subscription.core
 {
     public class LifeKeeper
     {

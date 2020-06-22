@@ -9,7 +9,7 @@ using pb = global::Google.Protobuf;
 using pbc = global::Google.Protobuf.Collections;
 using pbr = global::Google.Protobuf.Reflection;
 using scg = global::System.Collections.Generic;
-namespace enos_subscription_service.proto {
+namespace enos_subscription.proto {
 
   /// <summary>Holder for reflection information generated from sub.proto</summary>
   public static partial class SubReflection {

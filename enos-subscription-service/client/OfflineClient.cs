@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace enos_subscription_service.client
+namespace enos_subscription.client
 {
     public class OfflineClient : SubClient
     {

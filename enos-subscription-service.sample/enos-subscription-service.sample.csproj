@@ -54,9 +54,9 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\enos-subscription-service\enos-subscription-service.csproj">
+    <ProjectReference Include="..\enos-subscription-service\enos_subscription.csproj">
       <Project>{d035b13e-0b6a-4dc1-b2f4-2b6902ca9339}</Project>
-      <Name>enos-subscription-service</Name>
+      <Name>enos_subscription</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

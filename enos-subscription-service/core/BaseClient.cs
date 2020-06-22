@@ -1,5 +1,5 @@
-﻿using enos_subscription_service.proto;
-using enos_subscription_service.util;
+﻿using enos_subscription.proto;
+using enos_subscription.util;
 using ProtoBuf;
 using System;
 using System.Collections.Concurrent;
@@ -11,7 +11,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
-namespace enos_subscription_service.core
+namespace enos_subscription.core
 {
     public class BaseClient : IDisposable
     {
@@ -78,8 +78,6 @@ namespace enos_subscription_service.core
                     clientSocket = new TcpClient(AddressFamily.InterNetwork);
                     clientSocket.Connect(remoteEP);
                     stream = clientSocket.GetStream();
-
-                    Thread.Sleep(1000);
                 }
                 catch (Exception ex)
                 {
@@ -169,12 +167,14 @@ namespace enos_subscription_service.core
                 }
                 else
                 {
-                    throw new Exception("Subscription failed, sub info:" + sub_req.ToString());
+                    _logger.Error("Subscription failed, sub info:" + sub_req.ToString());
+                    reconnect();
                 }
             }
             else
             {
                 _logger.Error("Subscription failed, receive unexpected response, needed SubRsp, received:" + sub_res.cmdId);
+                reconnect();
             }
         }
 
@@ -200,6 +200,7 @@ namespace enos_subscription_service.core
             }
             if (pull_res.cmdId == (int)CmdId.PullRsp)
             {
+                next_ping_deadline = DateTime.Now.AddSeconds(ping_interval_in_sec);
                 PullRsp rsp = ProtoBufDecoder.DeserializeToObj<PullRsp>(pull_res.data);
                 if (rsp.msgDTO.messages.Count > 0)
                 {
@@ -264,15 +265,12 @@ namespace enos_subscription_service.core
                     else
                     {
                         return new TransferPkg { cmdId = -3 };
-                    }
+                    }                
                 }
                 catch (Exception ex)
                 {
                     _logger.Error("Error sending and receiving message: " + ex.Message);
-                    if (ex is SocketException)
-                    {
-                        reconnect();
-                    }
+                    reconnect();
                 }
 
                 return new TransferPkg { cmdId = -2 };
@@ -292,12 +290,7 @@ namespace enos_subscription_service.core
                 catch (Exception ex)
                 {
                     _logger.Error(ex, "Error occured pinging");
-                    if (ex is SocketException)
-                    {
-                        reconnect();
-                    }
-                    else
-                        throw;
+                    reconnect();
                 }
             }
         }

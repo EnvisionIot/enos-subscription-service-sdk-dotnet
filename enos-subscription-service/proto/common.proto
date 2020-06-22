@@ -1,7 +1,7 @@
 syntax = "proto2";
 
 package proto;
-option csharp_namespace = "enos_subscription_service.proto";
+option csharp_namespace = "enos_subscription.proto";
 
 enum CommonMsgType {
     ENUM_KVPairRecord2_0 = 101;

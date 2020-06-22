@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Configuration;
-using enos_subscription_service.client;
+using enos_subscription.client;
 
 namespace enos_subscription_service.sample
 {
@@ -14,22 +14,63 @@ namespace enos_subscription_service.sample
         {
             Console.WriteLine(string.Format("connecting to: ws://{0}:{1}", ConfigurationManager.AppSettings["host"], ConfigurationManager.AppSettings["port"]));
 
-
-            using (DataClient client = new DataClient(ConfigurationManager.AppSettings["host"], int.Parse(ConfigurationManager.AppSettings["port"]), ConfigurationManager.AppSettings["accesskey"], ConfigurationManager.AppSettings["accesssecret"]))
+            switch (ConfigurationManager.AppSettings["client_type"])
             {
-                try
-                {
-                    client.subscribe(ConfigurationManager.AppSettings["subid"]);
-                    foreach (var message in client.GetMessages())
+                case "0":
+                    using (DataClient client = new DataClient(ConfigurationManager.AppSettings["host"], int.Parse(ConfigurationManager.AppSettings["port"]), ConfigurationManager.AppSettings["accesskey"], ConfigurationManager.AppSettings["accesssecret"]))
                     {
-                        //Console.WriteLine("got message on client: " + message.key);
+                        try
+                        {
+                            client.subscribe(ConfigurationManager.AppSettings["subid"]);
+                            foreach (var message in client.GetMessages())
+                            {
+                                Console.WriteLine("got message on client: " + message.key);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(ex.Message);
+                        }
                     }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.Message);
-                }
+                    break;
+                case "1":
+                    using (AlertClient client = new AlertClient(ConfigurationManager.AppSettings["host"], int.Parse(ConfigurationManager.AppSettings["port"]), ConfigurationManager.AppSettings["accesskey"], ConfigurationManager.AppSettings["accesssecret"]))
+                    {
+                        try
+                        {
+                            client.subscribe(ConfigurationManager.AppSettings["subid"]);
+                            foreach (var message in client.GetMessages())
+                            {
+                                Console.WriteLine("got message on client: " + message.key);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(ex.Message);
+                        }
+                    }
+                    break;
+                case "3":
+                    using (OfflineClient client = new OfflineClient(ConfigurationManager.AppSettings["host"], int.Parse(ConfigurationManager.AppSettings["port"]), ConfigurationManager.AppSettings["accesskey"], ConfigurationManager.AppSettings["accesssecret"]))
+                    {
+                        try
+                        {
+                            client.subscribe(ConfigurationManager.AppSettings["subid"]);
+                            foreach (var message in client.GetMessages())
+                            {
+                                Console.WriteLine("got message on client: " + message.key);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(ex.Message);
+                        }
+                    }
+                    break;
+                default: break;
             }
+
+
 
             Console.ReadLine();
         }

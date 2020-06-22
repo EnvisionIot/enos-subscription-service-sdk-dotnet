@@ -1,4 +1,4 @@
-﻿using enos_subscription_service.proto;
+﻿using enos_subscription.proto;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace enos_subscription_service.util
+namespace enos_subscription.util
 {
     public class ProtoBufDecoder
     {
