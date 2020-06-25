@@ -113,7 +113,7 @@ namespace enos_subscription.client
                 else
                 {
                     _logger.Trace(string.Format("Polled _*NMM!_ message, key: {0}, partition: {1}, offset: {2}", message.key, message.partition, message.offset));
-                    break;
+                    continue;
                 }
             }
         }

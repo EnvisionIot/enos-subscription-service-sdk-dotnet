@@ -21,10 +21,10 @@ namespace enos_subscription_service.sample
                     {
                         try
                         {
-                            client.subscribe(ConfigurationManager.AppSettings["subid"]);
+                            client.subscribe(ConfigurationManager.AppSettings["subid"], ConfigurationManager.AppSettings["consumergroup"]);
                             foreach (var message in client.GetMessages())
                             {
-                                Console.WriteLine("got message on client: " + message.key);
+                                Console.WriteLine(string.Format("got message on client, key: {0}, partition: {1}, offset: {2}, value: {3}", message.key, message.partition, message.offset, message.value));
                             }
                         }
                         catch (Exception ex)
@@ -38,10 +38,10 @@ namespace enos_subscription_service.sample
                     {
                         try
                         {
-                            client.subscribe(ConfigurationManager.AppSettings["subid"]);
+                            client.subscribe(ConfigurationManager.AppSettings["subid"], ConfigurationManager.AppSettings["consumergroup"]);
                             foreach (var message in client.GetMessages())
                             {
-                                Console.WriteLine("got message on client: " + message.key);
+                                Console.WriteLine(string.Format("got message on client, key: {0}, partition: {1}, offset: {2}, value: {3}", message.key, message.partition, message.offset, message.value));
                             }
                         }
                         catch (Exception ex)
@@ -55,10 +55,10 @@ namespace enos_subscription_service.sample
                     {
                         try
                         {
-                            client.subscribe(ConfigurationManager.AppSettings["subid"]);
+                            client.subscribe(ConfigurationManager.AppSettings["subid"], ConfigurationManager.AppSettings["consumergroup"]);
                             foreach (var message in client.GetMessages())
                             {
-                                Console.WriteLine("got message on client: " + message.key);
+                                Console.WriteLine(string.Format("got message on client, key: {0}, partition: {1}, offset: {2}, value: {3}", message.key, message.partition, message.offset, message.value));
                             }
                         }
                         catch (Exception ex)

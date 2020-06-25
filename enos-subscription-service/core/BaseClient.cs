@@ -202,13 +202,22 @@ namespace enos_subscription.core
             {
                 next_ping_deadline = DateTime.Now.AddSeconds(ping_interval_in_sec);
                 PullRsp rsp = ProtoBufDecoder.DeserializeToObj<PullRsp>(pull_res.data);
-                if (rsp.msgDTO.messages.Count > 0)
+
+                int message_count = rsp.msgDTO.messages.Count;
+                if (message_count > 0)
                 {
-                    _logger.Info("Got " + rsp.msgDTO.messages.Count + " message(s).");
+                    _logger.Info("Got " + message_count.ToString() + " message(s).");
                 }
                 foreach (var message in rsp.msgDTO.messages)
                 {
-                    _logger.Trace(string.Format("Got message, key: {0}, partition: {1}, offset: {2}, topic: {3}", message.key, message.partition, message.offset, message.topic));
+                    if (rsp.msgDTO.messages.Count < 5)
+                    {
+                        _logger.Info(string.Format("Got message, key: {0}, partition: {1}, offset: {2}, topic: {3}", message.key, message.partition, message.offset, message.topic));
+                    }
+                    else
+                    {
+                        _logger.Trace(string.Format("Got message, key: {0}, partition: {1}, offset: {2}, topic: {3}", message.key, message.partition, message.offset, message.topic));
+                    }
                     queue.Add(message);
                 }
             }
@@ -265,7 +274,7 @@ namespace enos_subscription.core
                     else
                     {
                         return new TransferPkg { cmdId = -3 };
-                    }                
+                    }
                 }
                 catch (Exception ex)
                 {
