@@ -71,6 +71,7 @@ namespace enos_subscription_service.sample
             }
 
 
+            Console.WriteLine("Client exited....");
 
             Console.ReadLine();
         }

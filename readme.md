@@ -37,7 +37,7 @@ You can install the SDK from Package Manager Console, or build from source.
 The latest version of EnOS Data Subscription SDK for .NET is available in the Package Manager Console and can be installed using:
 
 ```
-Install-Package enos-subscribe
+Install-Package enos_subscription -Version 2.4.2
 ```
 
 <a name="obtain"></a>

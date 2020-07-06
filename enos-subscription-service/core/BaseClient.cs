@@ -32,7 +32,7 @@ namespace enos_subscription.core
         private readonly int DEFAULT_MESSAGE_QUEUE_SIZE = 100;
 
         private static NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-        private BlockingCollection<Message> queue = null;
+        private BlockingCollection<Message> queue = new BlockingCollection<Message>(100);
         internal bool isConnected = false;
         internal TcpClient clientSocket = null;
         NetworkStream stream = null;// clientSocket.GetStream()
@@ -51,13 +51,18 @@ namespace enos_subscription.core
         public void start()
         {
             epoch++;
-            queue = new BlockingCollection<Message>(DEFAULT_MESSAGE_QUEUE_SIZE);
+            //queue = new BlockingCollection<Message>(DEFAULT_MESSAGE_QUEUE_SIZE);
             connect();
         }
         void reconnect()
         {
+            if (queue == null) {
+                _logger.Error("Client disposed, reconnection aborted.");
+                return;
+            }
             _logger.Info("Reconnecting...");
-            Dispose();
+            //Dispose();
+            DisConnect();
             start();
         }
         void connect()
@@ -76,6 +81,8 @@ namespace enos_subscription.core
                     IPEndPoint remoteEP = new IPEndPoint(ip, port);
 
                     clientSocket = new TcpClient(AddressFamily.InterNetwork);
+                    clientSocket.SendTimeout= ping_interval_in_sec * 1000;
+                    clientSocket.ReceiveTimeout = ping_interval_in_sec * 1000;
                     clientSocket.Connect(remoteEP);
                     stream = clientSocket.GetStream();
                 }
@@ -184,7 +191,12 @@ namespace enos_subscription.core
                 return;
 
             PullReq pull_req = new PullReq();
-            pull_id++;
+
+            if (pull_id == int.MaxValue) 
+                pull_id = 1; 
+            else
+                pull_id++;
+
             pull_req.id = pull_id;
 
             _logger.Trace("Pulling data: " + pull_id);
@@ -210,14 +222,14 @@ namespace enos_subscription.core
                 }
                 foreach (var message in rsp.msgDTO.messages)
                 {
-                    if (rsp.msgDTO.messages.Count < 5)
-                    {
-                        _logger.Info(string.Format("Got message, key: {0}, partition: {1}, offset: {2}, topic: {3}", message.key, message.partition, message.offset, message.topic));
-                    }
-                    else
-                    {
-                        _logger.Trace(string.Format("Got message, key: {0}, partition: {1}, offset: {2}, topic: {3}", message.key, message.partition, message.offset, message.topic));
-                    }
+                    //if (message_count < 5)
+                    //{
+                    //    _logger.Info(string.Format("Got message, key: {0}, partition: {1}, offset: {2}, topic: {3}, value: {4}", message.key, message.partition, message.offset, message.topic, message.value));
+                    //}
+                    //else
+                    //{
+                    //    _logger.Trace(string.Format("Got message, key: {0}, partition: {1}, offset: {2}, topic: {3}, value: {4}", message.key, message.partition, message.offset, message.topic, message.value));
+                    //}
                     queue.Add(message);
                 }
             }
@@ -315,17 +327,20 @@ namespace enos_subscription.core
 
             return transfer_pkg;
         }
-
-        public void Dispose()
+        public void DisConnect()
         {
             isConnected = false;
-            epoch = 0;
+            //epoch = 0;
             if (clientSocket != null)
             {
                 clientSocket.Dispose();
             }
             if (stream != null)
                 stream.Dispose();
+        }
+        public void Dispose()
+        {
+            DisConnect();
             if (queue != null)
                 queue.Dispose();
         }
